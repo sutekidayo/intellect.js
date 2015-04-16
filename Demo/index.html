@@ -1,0 +1,627 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Javascript Neural Network</title>
+    <link href="CSS/bootstrap.min.css" rel="stylesheet"/>
+    <link href="CSS/bootstrap-theme.min.css" rel="stylesheet"/>
+    <!--<script src="../neuralnetOld.js"></script>-->
+
+    <!--<script src="../brain-0.6.3.min.js"></script>-->
+    <!--<script src="//code.jquery.com/jquery-1.11.2.min.js"></script>-->
+    <!--<script src="synaptic.js"></script>-->
+</head>
+<body>
+<div class="container-fluid">
+    <div class="jumbotron">
+        <h1 class="text-center">Neural Network Demo</h1>
+    </div>
+    <div class="row">
+
+        <div class="col-sm-2 col-xs-offset-0 text-center">
+            <h2>XOR Training</h2>
+            <table class="table table-bordered">
+                <tr>
+                    <td>0 , 0</td>
+                    <td>false</td>
+
+                </tr>
+                <tr>
+                    <td>1 , 0</td>
+                    <td>true</td>
+                </tr>
+                <tr>
+                    <td>0 , 1</td>
+                    <td>true</td>
+                </tr>
+                <tr>
+                    <td>1 , 1</td>
+                    <td>false</td>
+                </tr>
+            </table>
+            <button class="btn btn-primary" id="learnXOR">Learn XOR</button><br>
+            <button class="btn btn-info" id="learnXORGenetic">Learn XOR Genetic</button>
+        </div>
+        <div class="col-lg-3" id="xorLogger">
+        </div>
+        <div class="col-lg-3 col-sm-offset-0">
+            <h1>MNIST Training</h1>
+
+            <label for="training_images">Load Images & Labels</label>
+            <input type="file" id="training_images" name="files[]" multiple/>
+
+            <label for="mnistIndex">Digit to Check: </label>
+            <input type="number" id="mnistIndex" class="input-sm"/>
+            <button class="btn btn-info" id="checkDigit">Check Digit</button>
+            <label for="digitHidden">Hidden Layers:</label>
+            <input type="number" id="digitHidden" class="input-sm" value="100"/><br>
+            <label for="trainingSize">Training Data Size:</label>
+            <input type="number" id="trainingSize" class="input-sm" value="1000"/><br>
+            <label for="batchSize">Batch Size:</label>
+            <input type="number" id="batchSize" class="input-sm" value="1"/><br>
+            <label for="logPeriod">Log Period:</label>
+            <input type="number" id="logPeriod" class="input-sm" value="1"/><br>
+            <label for="learningRate">Learning Rate:</label>
+            <input type="number" id="learningRate" class="input-sm" value=".5"/><br>
+            <label for="momentum">Momentum:</label>
+            <input type="number" id="momentum" class="input-sm" value=".1"/><br>
+            <label for="epochs">Epochs:</label>
+            <input type="number" id="epochs" class="input-sm" value="30"/><br>
+            <label for="errorThreshold">Error Threshold:</label>
+            <input type="number" id="errorThreshold" class="input-sm" value=".15"/><br>
+            <button class="btn btn-primary" id="learnMNIST"><i class="glyphicon glyphicon-education"></i>Learn MNIST
+            </button>
+            <br>
+            <button class="btn btn-primary" id="saveNetwork"><i class="glyphicon glyphicon-save-file"></i> Save Network
+            </button>
+
+            <button class="btn btn-primary" id="loadNetworkButton"><i class="glyphicon glyphicon-open-file"></i> Load
+                Network
+            </button>
+            <a href="Network%20-%20Tue%20Apr%2007%202015%2001-45-29%20GMT-0800%20(Alaskan%20Daylight%20Time).json" download><button class="btn btn-primary" id="loadPreTrained"><i class="glyphicon glyphicon-download"></i> Download Already Trained Network</button></a>
+
+            <input id="loadNetwork" type="file" style="display:none;"/>
+
+            <h2>Hand Drawing Test</h2>
+            <button class="btn btn-default" id="clear"><i class="glyphicon glyphicon-erase"></i> Clear</button>
+            <canvas id="digitDrawer" width="140" height="140" style="border: 1px solid #000;"></canvas>
+            <button class="btn btn-primary" id="checkDrawing">Calculate Number</button>
+        </div>
+        <div class="col-lg-3" id="MNISTLogger">
+
+        </div>
+
+
+    </div>
+    <div>
+
+    </div>
+
+</div>
+
+<script src="JS/Intellect.js"></script>
+<script src="JS/jquery-2.1.3.min.js"></script>
+<script src="JS/bootstrap.min.js"></script>
+
+<script>
+
+    // Keep everything in anonymous function, called on window load.
+    if (window.addEventListener) {
+        window.addEventListener('load', function () {
+            var canvas, context, tool;
+
+            function init() {
+                // Find the canvas element.
+                canvas = document.getElementById('digitDrawer');
+                if (!canvas) {
+                    alert('Error: I cannot find the canvas element!');
+                    return;
+                }
+
+                if (!canvas.getContext) {
+                    alert('Error: no canvas.getContext!');
+                    return;
+                }
+
+                // Get the 2D canvas context.
+                context = canvas.getContext('2d');
+                if (!context) {
+                    alert('Error: failed to getContext!');
+                    return;
+                }
+
+                // Pencil tool instance.
+                tool = new tool_pencil();
+
+                // Attach the mousedown, mousemove and mouseup event listeners.
+                canvas.addEventListener('mousedown', ev_canvas, false);
+                canvas.addEventListener('mousemove', ev_canvas, false);
+                canvas.addEventListener('mouseup', ev_canvas, false);
+            }
+
+            // This painting tool works like a drawing pencil which tracks the mouse
+            // movements.
+            function tool_pencil() {
+                var tool = this;
+                this.started = false;
+
+                // This is called when you start holding down the mouse button.
+                // This starts the pencil drawing.
+                this.mousedown = function (ev) {
+                    context.beginPath();
+                    context.moveTo(ev._x, ev._y);
+                    tool.started = true;
+                };
+
+                // This function is called every time you move the mouse. Obviously, it only
+                // draws if the tool.started state is set to true (when you are holding down
+                // the mouse button).
+                this.mousemove = function (ev) {
+                    if (tool.started) {
+                        context.lineTo(ev._x, ev._y);
+                        context.lineWidth = 10;
+                        context.stroke();
+                    }
+                };
+
+                // This is called when you release the mouse button.
+                this.mouseup = function (ev) {
+                    if (tool.started) {
+                        tool.mousemove(ev);
+                        tool.started = false;
+                    }
+                };
+            }
+
+            // The general-purpose event handler. This function just determines the mouse
+            // position relative to the canvas element.
+            function ev_canvas(ev) {
+                if (ev.layerX || ev.layerX == 0) { // Firefox
+                    ev._x = ev.layerX;
+                    ev._y = ev.layerY;
+                } else if (ev.offsetX || ev.offsetX == 0) { // Opera
+                    ev._x = ev.offsetX;
+                    ev._y = ev.offsetY;
+                }
+
+                // Call the event handler of the tool.
+                var func = tool[ev.type];
+                if (func) {
+                    func(ev);
+                }
+            }
+
+            init();
+
+        }, false);
+    }
+</script>
+<script>
+    var labels;
+    var images;
+    var imagesBuffer;
+    var width;
+    var height;
+    var currentLog = null;
+    var MNISTNet = null;
+    var stop = false;
+    var MNISTOptions = {
+        Layers: [28 * 28, 100, 10],
+        TrainingMethod: "BackPropagate", // Possible Options: "BackPropagate" = Recursive Descent to minimize Cost Function, "Genetic" = A Genetic Mutation based on criteria, or provide your own function
+        ActivationFunction: "ElliotSigmoid",
+        ActivationFunctionDerivative: "Sigmoid",
+        ErrorFunction: "MeanSquaredError" // Possible Options: "MeanSquaredError", "QuadradicCost", and "CrossEntropy"
+
+    };
+
+    var BuildBridgedWorker = function (workerFunction, workerExportNames, mainExportNames, mainExportHandles) {
+
+        var baseWorkerStr = workerFunction.toString().match(/^\s*function\s*\(\s*\)\s*\{(([\s\S](?!\}$))*[\s\S])/)[1];
+        var extraWorkerStr = [];
+
+        // build a string for the worker end of the worker-calls-funciton-in-main-thread operation
+        extraWorkerStr.push("var main = {};\n");
+        for (var i = 0; i < mainExportNames.length; i++) {
+            var name = mainExportNames[i];
+            if (name.charAt(name.length - 1) == "*") {
+                name = name.substr(0, name.length - 1);
+                mainExportNames[i] = name;//we need this trimmed version back in main
+                extraWorkerStr.push("main." + name + " = function(/* arguments */){\n var args = Array.prototype.slice.call(arguments); var buffers = args.pop(); \n self.postMessage({foo:'" + name + "', args:args},buffers)\n}; \n");
+            } else {
+                extraWorkerStr.push("main." + name + " = function(/* arguments */){\n var args = Array.prototype.slice.call(arguments); \n self.postMessage({foo:'" + name + "', args:args})\n}; \n");
+            }
+        }
+
+        // build a string for the worker end of the main-thread-calls-function-in-worker operation
+        var tmpStr = [];
+        for (var i = 0; i < workerExportNames.length; i++) {
+            var name = workerExportNames[i];
+            name = name.charAt(name.length - 1) == "*" ? name.substr(0, name.length - 1) : name;
+            tmpStr.push(name + ": " + name);
+        }
+        extraWorkerStr.push("var foos={" + tmpStr.join(",") + "};\n");
+        extraWorkerStr.push("self.onmessage = function(e){\n");
+        extraWorkerStr.push("if(e.data.foo in foos) \n  foos[e.data.foo].apply(null, e.data.args); \n else \n throw(new Error('Main thread requested function ' + e.data.foo + '. But it is not available.'));\n");
+        extraWorkerStr.push("\n};\n");
+
+        var fullWorkerStr = baseWorkerStr + "\n\n/*==== STUFF ADDED BY BuildBridgeWorker ==== */\n\n" + extraWorkerStr.join("");
+
+        // create the worker
+        var url = window.URL.createObjectURL(new Blob([fullWorkerStr], {type: 'text/javascript'}));
+        var theWorker = new Worker(url);
+
+        // buid a funcion for the main part of worker-calls-function-in-main-thread operation
+        theWorker.onmessage = function (e) {
+            var fooInd = mainExportNames.indexOf(e.data.foo);
+            if (fooInd != -1)
+                mainExportHandles[fooInd].apply(null, e.data.args);
+            else
+                throw(new Error("Worker requested function " + e.data.foo + ". But it is not available."));
+        }
+
+        // build an array of functions for the main part of main-thread-calls-function-in-worker operation
+        var ret = {blobURL: url};//this is useful to know for debugging if you have loads of bridged workers in blobs with random names
+        var makePostMessageForFunction = function (name, hasBuffers) {
+            if (hasBuffers)
+                return function (/*args...,[ArrayBuffer,..]*/) {
+                    var args = Array.prototype.slice.call(arguments);
+                    var buffers = args.pop();
+                    theWorker.postMessage({foo: name, args: args}, buffers);
+                }
+            else
+                return function (/*args...*/) {
+                    var args = Array.prototype.slice.call(arguments);
+                    theWorker.postMessage({foo: name, args: args});
+                };
+        }
+
+        for (var i = 0; i < workerExportNames.length; i++) {
+            var name = workerExportNames[i];
+            if (name.charAt(name.length - 1) == "*") {
+                name = name.substr(0, name.length - 1);
+                ret[name] = makePostMessageForFunction(name, true);
+            } else {
+                ret[name] = makePostMessageForFunction(name, false);
+            }
+        }
+
+        return ret; //we return an object which lets the main thread call the worker.  The object will take care of the communication in the other direction.
+    }
+
+    function customLogger() {
+        var msg = "";
+        for (var i = 0; i < arguments.length; i++) {
+            if (typeof arguments[i] !== 'string') {
+                msg += "<span style='color:blue;'>" + JSON.stringify(arguments[i]) + "</span> ";
+            }
+            else {
+                msg += arguments[i] + " ";
+            }
+        }
+
+        currentLog.append(msg);
+    }
+
+    $("#learnXOR").click(function () {
+        $("#xorLogger").html("");
+
+        var old_console = console.log;
+        currentLog = $("#xorLogger");
+
+        customLogger("Creating Network");
+        customLogger("XORNetwork = new Intellect({SingleThreaded:true});");
+        var XORNetwork = new Intellect({SingleThreaded: true});
+        customLogger("Training on XOR");
+        customLogger("XORNetwork.Train([{<br>input:[0,0],output:[0]},<br>{input:[1,0],output:[1]},<br>{input:[0,1],output:[1]},<br>{input:[1,1],output:[0]<br>}],<br>{Training Options},<br>callback);");
+        var start = window.performance.now();
+        XORNetwork.Train([{input: [0, 0], output: [0]}, {input: [1, 0], output: [1]}, {
+            input: [0, 1],
+            output: [1]
+        }, {input: [1, 1], output: [0]}], {}, function (result) {
+            var end = window.performance.now() - start;
+            customLogger("Done. Training took:", end, "ms. Testing Results...");
+            customLogger(result);
+            //XORNetwork.ActivationFunction = XORNetwork.ActivationFunctions["ElliotSymmetrical"];
+            customLogger("XORNetwork.ComputeOutputs([0,0]) = ", XORNetwork.ComputeOutputs([0, 0]));
+            customLogger("XORNetwork.ComputeOutputs([1,0]) = ", XORNetwork.ComputeOutputs([1, 0]));
+            customLogger("XORNetwork.ComputeOutputs([0,1]) = ", XORNetwork.ComputeOutputs([0, 1]));
+            customLogger("XORNetwork.ComputeOutputs([1,1]) = ", XORNetwork.ComputeOutputs([1, 1]));
+        });
+
+    });
+
+    $("#learnXORGenetic").click(function () {
+        $("#xorLogger").html("");
+
+        var old_console = console.log;
+        currentLog = $("#xorLogger");
+
+        customLogger("Creating Network");
+        customLogger("XORNetwork = new Intellect({TrainingMethod:'Genetic'});");
+        var XORNetwork = new Intellect({TrainingMethod:"Genetic"});
+        customLogger("XORNetwork.ComputeOutputs([0,0]) = ", XORNetwork.ComputeOutputs([0, 0]));
+        customLogger("XORNetwork.ComputeOutputs([1,0]) = ", XORNetwork.ComputeOutputs([1, 0]));
+        customLogger("XORNetwork.ComputeOutputs([0,1]) = ", XORNetwork.ComputeOutputs([0, 1]));
+        customLogger("XORNetwork.ComputeOutputs([1,1]) = ", XORNetwork.ComputeOutputs([1, 1]));
+        customLogger("Training on XOR");
+        customLogger("XORNetwork.Train([{<br>input:[0,0],output:[0]},<br>{input:[1,0],output:[1]},<br>{input:[0,1],output:[1]},<br>{input:[1,1],output:[0]<br>}],<br>{Training Options},<br>callback);<br>");
+        var start = window.performance.now();
+        XORNetwork.Train([{input: [0, 0], output: [0]}, {input: [1, 0], output: [1]}, {
+            input: [0, 1],
+            output: [1]
+        }, {input: [1, 1], output: [0]}], {log:true}, function (result) {
+            var end = window.performance.now() - start;
+            customLogger("Done. Training took:", end/1000, "seconds. Testing Results...");
+            customLogger(result);
+            //XORNetwork.ActivationFunction = XORNetwork.ActivationFunctions["ElliotSymmetrical"];
+            customLogger("XORNetwork.ComputeOutputs([0,0]) = ", XORNetwork.ComputeOutputs([0, 0]));
+            customLogger("XORNetwork.ComputeOutputs([1,0]) = ", XORNetwork.ComputeOutputs([1, 0]));
+            customLogger("XORNetwork.ComputeOutputs([0,1]) = ", XORNetwork.ComputeOutputs([0, 1]));
+            customLogger("XORNetwork.ComputeOutputs([1,1]) = ", XORNetwork.ComputeOutputs([1, 1]));
+        });
+
+    });
+
+    $("#loadNetworkButton").click(function () {
+        $("#loadNetwork").click()
+    });
+
+
+    var ImageLoaderWorker = function () {
+        "use strict"; // This will become the first line of the worker
+
+        function parseTrainingImages(buff) {
+            var dv = new DataView(buff)
+            var magicNumber = dv.getUint32(0);
+            switch (magicNumber) {
+                case 2049: // MNIST LABEL FILE
+                    var vector_length = dv.getUint32(4);
+                    var labels = new Uint8Array(vector_length);
+                    var offset = 8;
+                    for (var i = 0; i < vector_length; i++) {
+                        labels[i] = dv.getUint8(offset++);
+                    }
+                    main.updateImageData({type: "labels", labels: labels.buffer}, [labels.buffer])
+                    break;
+                case 2051: // MNIST IMAGE FILE
+                    var vector_length = dv.getUint32(4);
+                    var width = dv.getUint32(8); // 0+uint8 = 1 bytes offset
+                    var height = dv.getUint32(12); // 0+uint8+uint16 = 3 bytes offset
+                    var length = width * height * vector_length;
+                    var images = new Uint8Array(length);
+                    var offset = 13;
+                    for (var i = 0; i < length; i++) {
+                        images[i] = dv.getUint8(offset++);
+                    }
+                    main.updateImageData({
+                        type: "images",
+                        numImages: vector_length,
+                        width: width,
+                        height: height,
+                        images: images.buffer
+                    }, [images.buffer]);
+                    break;
+                default:
+                    console.error("Unknown File Type")
+            }
+        }
+    };
+
+    var updateImageData = function (buffer) {
+
+        if (buffer.type == "labels") {
+            labels = new Uint8Array(buffer.labels);
+            console.log("Labels Loaded!");
+        }
+        else if (buffer.type == "images") {
+            imagesBuffer = new Uint8Array(buffer.images);
+            width = buffer.width;
+            height = buffer.height;
+            var singleimage = width * height;
+            images = new Array(buffer.numImages);
+            for (var i = 0; i < buffer.numImages; i++) {
+
+                images[i] = imagesBuffer.subarray(i * singleimage, (i + 1) * singleimage);
+            }
+            console.log("Images Loaded!");
+        }
+    }
+
+    var imageWorker = BuildBridgedWorker(ImageLoaderWorker, ["parseTrainingImages*"], ["updateImageData*"], [updateImageData]);
+
+    function loadTrainingImages(evt) {
+        var files = evt.target.files; // FileList object
+
+        // files is a FileList of File objects. List some properties.
+        for (var i = 0, f; f = files[i]; i++) {
+            var reader = new FileReader();
+
+            // Closure to capture the file information.
+            reader.onload = (function (theFile) {
+                return function (e) {
+                    // parse data
+                    var buffer = new Uint32Array(this.result);
+                    imageWorker.parseTrainingImages(buffer.buffer, [buffer.buffer]);
+                };
+            })(f);
+
+            // Read in the image file as a data URL.
+            reader.readAsArrayBuffer(f);
+        }
+    }
+
+    function loadNetwork(evt) {
+        var files = evt.target.files; // FileList object
+
+        // files is a FileList of File objects. List some properties.
+        for (var i = 0, f; f = files[i]; i++) {
+            var reader = new FileReader();
+
+            // Closure to capture the file information.
+            reader.onload = (function (theFile) {
+                return function (e) {
+                    MNISTNet = new Intellect();
+                    MNISTNet.loadNetwork(e.target.result);
+                }
+            })(f);
+
+            // Read in the image file as a data URL.
+            reader.readAsText(f);
+        }
+    }
+
+
+    document.getElementById('training_images').addEventListener('change', loadTrainingImages, false);
+    document.getElementById('loadNetwork').addEventListener('change', loadNetwork, false);
+
+    $("#checkDigit").click(function () {
+        var index = parseInt($("#mnistIndex").val());
+        if (!MNISTNet) {
+            createMNISTNetwork();
+        }
+        CheckOutput(index);
+    });
+    function drawDigit(index) {
+        var canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        var context = canvas.getContext('2d');
+        var image = context.createImageData(width, height);
+        for (var i = 0, j = 0; i < images[index].length; i++, j += 3) {
+            image.data[i + j + 0] = 255 - images[index][i];
+            image.data[i + j + 1] = 255 - images[index][i];
+            image.data[i + j + 2] = 255 - images[index][i];
+            image.data[i + j + 3] = 255;
+        }
+        context.putImageData(image, 0, 0);
+        $("#MNISTLogger").append(canvas);
+    }
+
+    function drawDigit2(sampleImage) {
+        var canvas = document.createElement('canvas');
+        canvas.width = 28;
+        canvas.height = 28;
+        var context = canvas.getContext('2d');
+        var image = context.createImageData(28, 28);
+        for (var i = 0, j = 0; i < sampleImage.length; i++, j += 3) {
+            image.data[i + j + 0] = 255 - sampleImage[i];
+            image.data[i + j + 1] = 255 - sampleImage[i];
+            image.data[i + j + 2] = 255 - sampleImage[i];
+            image.data[i + j + 3] = 255;
+        }
+        context.putImageData(image, 0, 0);
+        $("#MNISTLogger").append(canvas);
+    }
+
+
+    $("#learnMNIST").click(function () {
+
+        var old_console = console.log;
+        currentLog = $("#MNISTLogger");
+
+
+        currentLog.html("");
+
+        createMNISTNetwork();
+        var TrainingSize = parseInt($("#trainingSize").val());
+        var trainingOptions = {
+            epochs: parseInt($("#epochs").val()),
+            errorThresh: parseFloat($("#errorThreshold").val()),
+            learningRate: parseFloat($("#learningRate").val()),
+            momentum: parseFloat($("#momentum").val()),
+            BatchSize: 1,
+            callback: customLogger,
+            callbackPeriod: parseInt($("#logPeriod").val())
+            //logPeriod: parseInt($("#logPeriod").val()),
+            //log:true
+        };
+
+
+        var trainingData = [];
+        for (var i = 0; i < TrainingSize; i++) {
+            var output = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+            output[labels[i]] = 1;
+            trainingData[i] = {input: images[i], output: output}
+        }
+
+
+        MNISTNet.Train(trainingData, trainingOptions, function (result) {
+            customLogger(result);
+        });
+
+    });
+
+    function createMNISTNetwork() {
+
+        MNISTOptions.Layers[1] = parseInt($("#digitHidden").val());
+
+        MNISTNet = new Intellect(MNISTOptions);
+    }
+
+    function checkAccuracy() {
+        var accuracy = 0;
+        for (var i = 0; i < images.length; i++) {
+            var result = getMax(MNISTNet.ComputeOutputs(images[i]));
+            if (result == labels[i]) {
+                accuracy++;
+            }
+        }
+
+        console.log("Accuracy: ", accuracy, "/10000 or ", (accuracy / images.length) * 100, "%");
+    }
+
+
+    function getMax(array) {
+        var max = 0;
+        for (var i = 1; i < array.length; i++) {
+            if (array[i] > array[max]) {
+                max = i;
+            }
+        }
+        return max;
+    }
+
+    function CheckOutput(index) {
+        drawDigit(index);
+        var result = MNISTNet.ComputeOutputs(images[index]);
+        result = getMax(result);
+        $("#MNISTLogger").append("=" + result + "<br>");
+
+    }
+
+    $("#saveNetwork").click(function () {
+        MNISTNet.saveNetwork();
+    });
+
+    $("#checkDrawing").click(function () {
+        MNISTNet = MNISTNet || new Intellect({Layers: [784, 100, 10]});
+        var canvas = document.getElementById("digitDrawer");
+        var canvas2 = document.createElement("canvas");
+        canvas2.width = 28;
+        canvas2.height = 28;
+        var context = canvas2.getContext('2d');
+        context.drawImage(canvas, 0, 0, 28, 28);
+        var imageData = context.getImageData(0, 0, canvas2.width, canvas2.height);
+
+        var image = [];
+        for (var i = 0, j = 3; i < 784; i++, j += 4) {
+            image[i] = imageData.data[j] // just grab the opacity
+        }
+
+        drawDigit2(image);
+        var result = MNISTNet.ComputeOutputs(image);
+        $("#MNISTLogger").append("=" + getMax(result));
+        console.log(result);
+    });
+
+    $("#clear").click(function () {
+        var canvas = document.getElementById("digitDrawer");
+        var context = canvas.getContext('2d');
+        context.clearRect(0, 0, canvas.width, canvas.height);
+    });
+
+</script>
+</body>
+</html>
