@@ -657,7 +657,7 @@
 
         Initialize: function (NetworkConfiguration) {
             if (this.options.Layers.length == 2 && this.options.AutomaticHiddenLayer) {
-                // Add a hidden layer using the rule that it should 2/3 thei size of the input plus the size of the output
+                // Add a hidden layer using the rule that it should 2/3 the size of the input plus the size of the output
                 Math.floor((2 / 3) * this.options.Layers[0] + this.options.Layers[1])
 
             }
